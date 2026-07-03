@@ -1,0 +1,32 @@
+﻿# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# Env / secrets
+.env
+gcp/*.json
+!gcp/.gitkeep
+
+# Airflow
+logs/*
+!logs/.gitkeep
+airflow.db
+airflow-webserver.pid
+.airflow/
+
+# Docker
+*.log
+
+# Data (local scratch only, never commit real data)
+data/bronze/*
+data/silver/*
+!data/bronze/.gitkeep
+!data/silver/.gitkeep
+
+# OS / IDE
+.vscode/
+.idea/
+.DS_Store
