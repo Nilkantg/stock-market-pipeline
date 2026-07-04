@@ -53,15 +53,25 @@ x-airflow-common:
   # build: .
   environment:
     &airflow-common-env
+
     AIRFLOW__CORE__EXECUTOR: CeleryExecutor
+    PYTHONPATH: /opt/airflow
+
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
     AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:airflow@postgres/airflow
     AIRFLOW__CELERY__BROKER_URL: redis://:@redis:6379/0
+
     AIRFLOW__CORE__FERNET_KEY: ''
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
     AIRFLOW__CORE__LOAD_EXAMPLES: 'true'
     AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session'
-    GCS_BUCKET_BRONZE: '${GCS_BUCKET_BRONZE}'
+
+    GCP_PROJECT_ID: ${GCP_PROJECT_ID}
+    GCS_BUCKET_BRONZE: ${GCS_BUCKET_BRONZE}
+    GCS_BUCKET_SILVER: ${GCS_BUCKET_SILVER}
+    BQ_DATASET_SILVER: ${BQ_DATASET_SILVER}
+    BQ_DATASET_GOLD: ${BQ_DATASET_GOLD}
+    GOOGLE_APPLICATION_CREDENTIALS: ${GOOGLE_APPLICATION_CREDENTIALS}
     # yamllint disable rule:line-length
     # Use simple http server on scheduler for health checks
     # See https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/logging-monitoring/check-health.html#scheduler-health-check-server
