@@ -16,6 +16,7 @@ import os
 from datetime import datetime, timedelta
 
 from airflow.decorators import dag, task
+from airflow.datasets import Dataset
 from airflow.models import Variable
 
 logger = logging.getLogger(__name__)
@@ -26,6 +27,10 @@ logger = logging.getLogger(__name__)
 DEFAULT_SYMBOLS = ["RELIANCE.NS", "TCS.NS", "INFY.NS", "HDFCBANK.NS", "WIPRO.NS"]
 
 BUCKET_BRONZE = os.environ.get("GCS_BUCKET_BRONZE", "CHANGE_ME_BRONZE_BUCKET")
+
+# Abstract "dataset" representing "Bronze stock data for today is ready".
+# The Silver DAG schedules itself on this being updated, instead of cron.
+BRONZE_STOCKS_DATASET = Dataset(f"gs://{BUCKET_BRONZE}/bronze/stocks/")
 
 default_args = {
     "owner": "data-eng",
@@ -112,7 +117,7 @@ def fetch_bronze_stocks():
 
         return records
 
-    @task
+    @task(outlets=[BRONZE_STOCKS_DATASET])
     def write_to_bronze(records: list[dict], **context) -> list[str]:
         """
         Write fetched records to GCS Bronze, one JSON file per symbol.

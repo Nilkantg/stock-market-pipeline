@@ -1,2 +1,4 @@
 ﻿yfinance==0.2.40
 google-cloud-storage==2.18.0
+pandas==2.2.2
+pyarrow==17.0.0
