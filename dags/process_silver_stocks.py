@@ -96,7 +96,7 @@ def process_silver_stocks():
 
         return df_json
 
-    @task
+    @task(outlets=[Dataset(f"bq://{GCP_PROJECT_ID}.{BQ_DATASET_SILVER}.{BQ_TABLE}")])
     def write_silver(df_json: str, **context) -> dict:
         import pandas as pd
 
