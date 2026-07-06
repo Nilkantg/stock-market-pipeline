@@ -7,17 +7,38 @@ This is intentionally "dumb" — Bronze stores exactly what the source gave us.
 """
 
 import logging
-from datetime import datetime, timedelta
-from typing import Optional
+from datetime import datetime, timedelta, timezone
 
+import pandas as pd
 import yfinance as yf
 
 logger = logging.getLogger(__name__)
+IST = timezone(timedelta(hours=5, minutes=30), name="IST")
 
 
 class FetchError(Exception):
     """Raised when a symbol's data cannot be fetched after retries."""
     pass
+
+
+def _now_ist() -> str:
+    return datetime.now(IST).isoformat()
+
+
+def _normalize_download_frame(hist: pd.DataFrame, symbol: str) -> pd.DataFrame:
+    """
+    yfinance.download can return simple OHLCV columns for one symbol or a
+    MultiIndex when ticker grouping is present. Bronze wants one row with
+    regular Open/High/Low/Close/Volume columns either way.
+    """
+    if not isinstance(hist.columns, pd.MultiIndex):
+        return hist
+
+    for level in range(hist.columns.nlevels):
+        if symbol in hist.columns.get_level_values(level):
+            return hist.xs(symbol, axis=1, level=level)
+
+    return hist
 
 
 def fetch_symbol_data(symbol: str, target_date: str) -> dict:
@@ -37,14 +58,21 @@ def fetch_symbol_data(symbol: str, target_date: str) -> dict:
         FetchError: if the API call itself fails (network, symbol not found, etc.)
     """
     try:
-        ticker = yf.Ticker(symbol)
-
-        # yfinance's `history` end date is exclusive, so we ask for a 1-day window
+        # yfinance's `download` end date is exclusive, so we ask for a 1-day window
         start = target_date
         end_dt = datetime.strptime(target_date, "%Y-%m-%d") + timedelta(days=1)
         end = end_dt.strftime("%Y-%m-%d")
 
-        hist = ticker.history(start=start, end=end, interval="1d")
+        hist = yf.download(
+            symbol,
+            start=start,
+            end=end,
+            interval="1d",
+            progress=False,
+            auto_adjust=False,
+            threads=False,
+        )
+        hist = _normalize_download_frame(hist, symbol)
 
         if hist.empty:
             # Not an exception — a real, expected outcome (market holiday, delisted
@@ -55,7 +83,7 @@ def fetch_symbol_data(symbol: str, target_date: str) -> dict:
                 "symbol": symbol,
                 "date": target_date,
                 "fetch_status": "no_data",
-                "fetched_at": datetime.utcnow().isoformat(),
+                "fetched_at": _now_ist(),
                 "data": None,
             }
 
@@ -64,7 +92,7 @@ def fetch_symbol_data(symbol: str, target_date: str) -> dict:
             "symbol": symbol,
             "date": target_date,
             "fetch_status": "success",
-            "fetched_at": datetime.utcnow().isoformat(),
+            "fetched_at": _now_ist(),
             "data": {
                 "open": float(row["Open"]),
                 "high": float(row["High"]),
@@ -99,7 +127,7 @@ def fetch_all_symbols(symbols: list[str], target_date: str) -> list[dict]:
                 "symbol": symbol,
                 "date": target_date,
                 "fetch_status": "error",
-                "fetched_at": datetime.utcnow().isoformat(),
+                "fetched_at": _now_ist(),
                 "data": None,
                 "error_message": str(e),
             })

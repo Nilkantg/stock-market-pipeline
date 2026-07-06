@@ -13,13 +13,15 @@ upstream dependency. Phase 2's Silver DAG will depend on this one completing.
 
 import logging
 import os
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from airflow.decorators import dag, task
 from airflow.datasets import Dataset
 from airflow.models import Variable
+import pendulum
 
 logger = logging.getLogger(__name__)
+IST = pendulum.timezone("Asia/Kolkata")
 
 # --- Config -------------------------------------------------------------
 # Symbols are hardcoded for now; Phase 5 moves this to an Airflow Variable
@@ -57,11 +59,21 @@ def alert_on_failure(context):
     )
 
 
+def _target_date_from_context(context) -> str:
+    """
+    Use the run's interval end in IST. For the 18:00 IST schedule this resolves
+    to the Indian trading date that just closed, and manual runs stay aligned
+    with the IST calendar date shown to the operator.
+    """
+    run_end = context.get("data_interval_end") or context["logical_date"]
+    return run_end.in_timezone(IST).date().isoformat()
+
+
 @dag(
     dag_id="fetch_bronze_stocks",
     description="Fetch daily OHLCV data for tracked symbols and land raw in GCS Bronze",
-    schedule="0 18 * * *",  # 18:00 daily (server time — see note in README on timezone)
-    start_date=datetime(2026, 6, 1),
+    schedule="0 18 * * *",  # 18:00 IST, after Indian market close
+    start_date=pendulum.datetime(2026, 6, 1, tz=IST),
     catchup=False,  # don't backfill historical runs on first deploy
     default_args=default_args,
     on_failure_callback=alert_on_failure,
@@ -96,7 +108,7 @@ def fetch_bronze_stocks():
         # every few seconds; heavy imports at module level slow that down).
         from scripts.bronze.fetch_stocks import fetch_all_symbols
 
-        target_date = context["ds"]  # "YYYY-MM-DD" logical date of this run
+        target_date = _target_date_from_context(context)
         logger.info("Fetching %d symbols for %s", len(symbols), target_date)
 
         records = fetch_all_symbols(symbols, target_date)
@@ -127,7 +139,7 @@ def fetch_bronze_stocks():
         """
         from scripts.bronze.gcs_writer import write_records_to_gcs
 
-        target_date = context["ds"]
+        target_date = _target_date_from_context(context)
         paths = write_records_to_gcs(records, BUCKET_BRONZE, target_date)
         logger.info("Wrote %d files to gs://%s/bronze/stocks/date=%s/", len(paths), BUCKET_BRONZE, target_date)
         return paths
