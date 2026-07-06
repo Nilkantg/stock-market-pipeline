@@ -82,6 +82,7 @@ with dag(
         },
         gcp_conn_id="google_cloud_default",
         location=os.environ.get("GCP_REGION", "asia-south1"),
+        outlets=[Dataset(f"bq://{GCP_PROJECT_ID}.gold_stocks.gold_daily_summary")],
     )
 
     build_moving_averages = BigQueryInsertJobOperator(
@@ -94,6 +95,7 @@ with dag(
         },
         gcp_conn_id="google_cloud_default",
         location=os.environ.get("GCP_REGION", "asia-south1"),
+        outlets=[Dataset(f"bq://{GCP_PROJECT_ID}.gold_stocks.gold_moving_averages")],
     )
 
     build_sector_summary = BigQueryInsertJobOperator(
@@ -106,6 +108,7 @@ with dag(
         },
         gcp_conn_id="google_cloud_default",
         location=os.environ.get("GCP_REGION", "asia-south1"),
+        outlets=[Dataset(f"bq://{GCP_PROJECT_ID}.gold_stocks.gold_sector_summary")],
     )
 
     # gold_sector_summary reads FROM gold_daily_summary, so it must wait.
