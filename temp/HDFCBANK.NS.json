@@ -1,0 +1,16 @@
+{
+  "symbol": "HDFCBANK.NS",
+  "date": "2026-07-06",
+  "fetch_status": "success",
+  "fetched_at": "2026-07-07T12:58:58.875984+05:30",
+  "source": "alpha_vantage",
+  "data": {
+    "open": 805.65,
+    "high": 831.7,
+    "low": 805.65,
+    "close": 829.75,
+    "volume": 2987445,
+    "dividends": 0.0,
+    "stock_splits": 0.0
+  }
+}

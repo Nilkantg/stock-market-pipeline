@@ -1,0 +1,16 @@
+{
+  "symbol": "WIPRO.NS",
+  "date": "2026-07-06",
+  "fetch_status": "success",
+  "fetched_at": "2026-07-07T12:59:01.553873+05:30",
+  "source": "alpha_vantage",
+  "data": {
+    "open": 176.15,
+    "high": 176.5,
+    "low": 173.55,
+    "close": 174.3,
+    "volume": 856318,
+    "dividends": 0.0,
+    "stock_splits": 0.0
+  }
+}

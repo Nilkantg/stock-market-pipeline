@@ -29,6 +29,8 @@ IST = pendulum.timezone("Asia/Kolkata")
 DEFAULT_SYMBOLS = ["RELIANCE.NS", "TCS.NS", "INFY.NS", "HDFCBANK.NS", "WIPRO.NS"]
 
 BUCKET_BRONZE = os.environ.get("GCS_BUCKET_BRONZE", "CHANGE_ME_BRONZE_BUCKET")
+DEFAULT_LOOKBACK_DAYS = int(os.environ.get("STOCK_HISTORY_LOOKBACK_DAYS", "31"))
+ALPHA_VANTAGE_API_KEY = os.environ.get("ALPHA_VANTAGE_API_KEY")
 
 # Abstract "dataset" representing "Bronze stock data for today is ready".
 # The Silver DAG schedules itself on this being updated, instead of cron.
@@ -69,12 +71,18 @@ def _target_date_from_context(context) -> str:
     return run_end.in_timezone(IST).date().isoformat()
 
 
+def _date_window_from_context(context, lookback_days: int = DEFAULT_LOOKBACK_DAYS) -> tuple[str, str]:
+    end_date = pendulum.parse(_target_date_from_context(context), tz=IST)
+    start_date = end_date.subtract(days=lookback_days - 1)
+    return start_date.date().isoformat(), end_date.date().isoformat()
+
+
 @dag(
     dag_id="fetch_bronze_stocks",
     description="Fetch daily OHLCV data for tracked symbols and land raw in GCS Bronze",
     schedule="0 18 * * *",  # 18:00 IST, after Indian market close
     start_date=pendulum.datetime(2026, 6, 1, tz=IST),
-    catchup=False,  # don't backfill historical runs on first deploy
+    catchup=False,  # each run fetches a rolling historical window itself
     default_args=default_args,
     on_failure_callback=alert_on_failure,
     tags=["bronze", "ingestion", "stocks"],
@@ -98,20 +106,30 @@ def fetch_bronze_stocks():
         return DEFAULT_SYMBOLS
 
     @task
-    def fetch_data(symbols: list[str], **context) -> list[dict]:
+    def get_alpha_vantage_api_key() -> str:
+        api_key = Variable.get("alpha_vantage_api_key", default_var=ALPHA_VANTAGE_API_KEY)
+        if not api_key:
+            raise ValueError(
+                "Missing Alpha Vantage API key. Set Airflow Variable "
+                "'alpha_vantage_api_key' or environment variable ALPHA_VANTAGE_API_KEY."
+            )
+        return api_key
+
+    @task
+    def fetch_data(symbols: list[str], api_key: str, **context) -> list[dict]:
         """
-        Fetch OHLCV data for all symbols for this DAG run's logical date.
-        Returned list is small (5 symbols worth of floats/ints) so passing
-        it via XCom to the next task is fine.
+        Fetch OHLCV data for all symbols for the rolling historical window.
+        Alpha Vantage compact output gives enough recent trading days for the
+        first one-month backfill and daily incremental refresh.
         """
         # Late import: keeps DAG-parse time fast (Airflow parses this file
         # every few seconds; heavy imports at module level slow that down).
-        from scripts.bronze.fetch_stocks import fetch_all_symbols
+        from scripts.bronze.fetch_stocks import fetch_symbols_for_range
 
-        target_date = _target_date_from_context(context)
-        logger.info("Fetching %d symbols for %s", len(symbols), target_date)
+        start_date, end_date = _date_window_from_context(context)
+        logger.info("Fetching %d symbols from %s through %s", len(symbols), start_date, end_date)
 
-        records = fetch_all_symbols(symbols, target_date)
+        records = fetch_symbols_for_range(symbols, start_date, end_date, api_key)
 
         success_count = sum(1 for r in records if r["fetch_status"] == "success")
         no_data_count = sum(1 for r in records if r["fetch_status"] == "no_data")
@@ -132,21 +150,22 @@ def fetch_bronze_stocks():
     @task(outlets=[BRONZE_STOCKS_DATASET])
     def write_to_bronze(records: list[dict], **context) -> list[str]:
         """
-        Write fetched records to GCS Bronze, one JSON file per symbol.
+        Write fetched records to GCS Bronze, one JSON file per symbol/date.
         Returns the list of gs:// URIs written (small, so fine for XCom;
         Phase 2's Silver DAG could either re-list the GCS prefix itself
         or, for a tighter coupling, read this XCom via a Dataset/trigger).
         """
         from scripts.bronze.gcs_writer import write_records_to_gcs
 
-        target_date = _target_date_from_context(context)
-        paths = write_records_to_gcs(records, BUCKET_BRONZE, target_date)
-        logger.info("Wrote %d files to gs://%s/bronze/stocks/date=%s/", len(paths), BUCKET_BRONZE, target_date)
+        start_date, end_date = _date_window_from_context(context)
+        paths = write_records_to_gcs(records, BUCKET_BRONZE)
+        logger.info("Wrote %d files to gs://%s/bronze/stocks/ for %s through %s", len(paths), BUCKET_BRONZE, start_date, end_date)
         return paths
 
     # --- Task dependency wiring (TaskFlow infers this from the call chain) ---
     symbols = get_symbol_list()
-    records = fetch_data(symbols)
+    api_key = get_alpha_vantage_api_key()
+    records = fetch_data(symbols, api_key)
     write_to_bronze(records)
 
 

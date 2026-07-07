@@ -1,0 +1,16 @@
+{
+  "symbol": "INFY.NS",
+  "date": "2026-07-06",
+  "fetch_status": "success",
+  "fetched_at": "2026-07-07T12:58:55.273398+05:30",
+  "source": "alpha_vantage",
+  "data": {
+    "open": 1057.85,
+    "high": 1057.85,
+    "low": 1033.0,
+    "close": 1042.4,
+    "volume": 311828,
+    "dividends": 0.0,
+    "stock_splits": 0.0
+  }
+}

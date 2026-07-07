@@ -1,0 +1,16 @@
+{
+  "symbol": "TCS.NS",
+  "date": "2026-07-06",
+  "fetch_status": "success",
+  "fetched_at": "2026-07-07T12:58:51.147557+05:30",
+  "source": "alpha_vantage",
+  "data": {
+    "open": 2096.8,
+    "high": 2096.8,
+    "low": 2050.6001,
+    "close": 2057.5,
+    "volume": 130125,
+    "dividends": 0.0,
+    "stock_splits": 0.0
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "symbol": "RELIANCE.NS",
+  "date": "2026-07-06",
+  "fetch_status": "success",
+  "fetched_at": "2026-07-07T12:58:48.653193+05:30",
+  "source": "alpha_vantage",
+  "data": {
+    "open": 1304.55,
+    "high": 1325.85,
+    "low": 1299.35,
+    "close": 1321.4,
+    "volume": 874318,
+    "dividends": 0.0,
+    "stock_splits": 0.0
+  }
+}
